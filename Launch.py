@@ -231,10 +231,59 @@ class Net(nn.Module):
         x = self.dense(x)
         return x
 
+## CNN+LSTM
+"""
+在之前CnnDem的基础上：继承CnnDem类并重写__init__和forward方法
+添加两个LSTM层
+注意：这里的LSTM层是为了提取时间序列特征
+LSTM的输入数据格式为(batch, seq_len, feature_size)
+CnnDem的输出数据格式为(batch, feature_size, seq_len) 
+因此中途要对张量数据需要转置
+"""
+class CnnLstmDem(CnnDem):
+    def __init__(self,
+            in_ch = 1, 
+            out_ch1 = 16, 
+            out_ch2 = 32, 
+            out_ch3 = 32, 
+            out_ch4 = 64, 
+            out_ch5 = 64, 
+            out_ch6 = 64,
+            lstm_hidden_size1=16,
+            lstm_hidden_size2=1
+            ):
+        super(CnnLstmDem, self).__init__(
+            in_ch, out_ch1, out_ch2, out_ch3, out_ch4, out_ch5, out_ch6
+        )
+        # LSTM层
+        self.lstm1 = nn.LSTM(
+            input_size=out_ch6,
+            hidden_size=lstm_hidden_size1,
+            batch_first=True
+        )
+        self.lstm2 = nn.LSTM(
+            input_size=lstm_hidden_size1,
+            hidden_size=lstm_hidden_size2,
+            batch_first=True
+        )
+        self.fc = nn.Linear(8, 1) # 缩为1个输出特征值
+
+    def forward(self, x): # 重写forward方法
+        out = x.permute(0, 2, 1) # 转置为CNN需要的格式
+        for cnn in self.CNNs:
+            out = cnn(out)
+        out = out.permute(0, 2, 1) # 转置为LSTM需要的格式
+        out, _ = self.lstm1(out)
+        out, _ = self.lstm2(out)
+        out = out.squeeze(-1) # 去掉最后一维，这不会导致数据损失
+        out = self.fc(out)
+        return out
+
 ## nn网络集合
 class NetCollection():
     lstmNet = None
     cnnDem = None
+    cnnLstmDem = None
 
 
 # PS: 以下的部分页面类代码摘自过去的项目
@@ -297,8 +346,9 @@ class MainPage(Page):
         super().__init__(page_number, page_manager, net_collection)
         self.titleString = "Main Page"
         self.descriptionString = "This is the main page, which to select a model to run."
-        self.choicesString = "[1] LSTM Page\n[2] CNN Page\n[0] Exit"
+        self.choicesString = "[1] LSTM Page\n[2] CNN Page\n[3] CNN+LSTM Page\n[0] Exit"
         self.pageNumber_dict = {
+            "3": 3,
             "2": 2,
             "1": 1,
             "0": -1
@@ -408,6 +458,53 @@ class CNNPage(Page):
         print("CNN Net ran successfully.")
         input("Press Enter to continue...")
 
+#### CNN页面
+class CNNLSTMPage(Page):
+    def __init__(self, page_number, page_manager: PageManager, net_collection: NetCollection=None):
+        super().__init__(page_number, page_manager, net_collection)
+        self.titleString = "CNN+LSTM Processing Page"
+        self.descriptionString = "This page processes data using the CNN+LSTM model."
+        self.choicesString = "[1] Init CnnLstm Model\n[2] Run random data into CnnLstm Model\n[0] Back to Main Page"
+
+        self.function_dict = {
+            "1": "Init Model",
+            "2": "Run random data into Model"
+        }
+
+        self.pageNumber_dict = {
+            "0": 0
+        }
+
+    def display(self):
+        print(self.titleString)
+        print(self.choicesString)
+        inp = input(self.inquireString)
+        if inp in self.pageNumber_dict:
+            self.page_manager.goto_page(self.pageNumber_dict[inp])
+        elif inp in self.function_dict:
+            if inp == "1":
+                self.init_model()
+            elif inp == "2":
+                if self.net_collection.cnnLstmDem is None:
+                    print("CNN+LSTM Model is not initialized. Please initialize it first.")
+                else:
+                    self.run_random_data()
+        else:
+            print("Invalid choice. Please try again.")
+
+    def init_model(self):
+        self.net_collection.cnnLstmDem = CnnLstmDem() # CNN集合解调器
+        print("CNN+LSTM Model initialized.")
+
+    def run_random_data(self):
+        input_data = torch.randn(2, 508, 1)
+        output_data = self.net_collection.cnnLstmDem(input_data)
+        print("输入形状: ", input_data.shape)
+        print("CnnLstmDemodulator输出形状: ", output_data.shape)
+        # 预期形状为[2, 1]
+        print("CNN+LSTM Model ran successfully.")
+        input("Press Enter to continue...")
+
 # 主程序入口
 if __name__ == "__main__":
     # 启动时的语句
@@ -420,6 +517,7 @@ if __name__ == "__main__":
     main_page = MainPage(0, page_manager, net_collection)
     lstm_page = LSTMPage(1, page_manager, net_collection)
     cnn_page = CNNPage(2, page_manager, net_collection)
+    cnnlstm_page = CNNLSTMPage(3, page_manager, net_collection)
     # 主循环
     while True:
         current_page = page_manager.pages[page_manager.curPageNumber]

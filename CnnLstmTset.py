@@ -1,5 +1,10 @@
 # CnnLstmTest.py
 # 构建CNN+LSTM的模型
+"""
+CNN+LSTM模型已完成测试
+它已经融入Launch.py
+可以在Launch.py中被引用
+"""
 
 print("Loading torch...")
 import torch
@@ -18,7 +23,7 @@ exec(CnnDemFile.read())
 # 从过去的文件中获取两个类
 
 # CNN+LSTM
-# CnnLstmFusion(以此作为类的名字)
+# CnnLstmDem(以此作为类的名字)
 """
 在之前CnnDem的基础上：继承CnnDem类并重写__init__和forward方法
 添加两个LSTM层
@@ -89,4 +94,3 @@ if __name__ == "__main__":
     print("CnnDemodulator输出形状: ", output_data.shape)
     # 现在的预期形状为
     # >>> torch.Size([2, 1])
-    
