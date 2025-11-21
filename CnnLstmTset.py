@@ -56,8 +56,8 @@ class CnnLstmDem(CnnDem):
             hidden_size=lstm_hidden_size2,
             batch_first=True
         )
-        # 修改全连接层的输入大小
-        self.fc = nn.Linear(lstm_hidden_size2, 1)
+        # 修改全连接层的输入大小，这时的序列还有8个时间步
+        self.fc = nn.Linear(8, 1) # 缩为1个输出特征值
 
     def forward(self, x): # 重写forward方法
         out = x.permute(0, 2, 1) # 转置为CNN需要的格式
@@ -65,14 +65,20 @@ class CnnLstmDem(CnnDem):
             out = cnn(out)
         out = out.permute(0, 2, 1) # 转置为LSTM需要的格式
         out, _ = self.lstm1(out)
-        print(out.shape)
         out, _ = self.lstm2(out)
         print(out.shape)
-        # out = out[:, -1, :] # 取最后一个时间步的输出
+
+        # 下面一步：去掉最后一维
+        # 去维很重要，因为LSTM的输出是三维的(batch, seq_len, hidden_size)
+        # 而hidden_size此时为1，我们只需要(batch, seq_len)
+        # 不然会导致后续全连接层维度不匹配
+        out = out.squeeze(-1)
+        # print(out.shape) # 查看LSTM输出形状以及数据内容是否丢失
+        print(out) # 查看LSTM输出
+        # out = out[:, -1, :] # 取最后一个时间步的输出，但这里用不到
+
         out = self.fc(out)
         return out
-
-
 
 if __name__ == "__main__":
     pass
@@ -81,4 +87,6 @@ if __name__ == "__main__":
     model = CnnLstmDem()
     output_data = model(input_data)
     print("CnnDemodulator输出形状: ", output_data.shape)
-    # 现在的预期形状为[2, 1]
+    # 现在的预期形状为
+    # >>> torch.Size([2, 1])
+    
